@@ -42,6 +42,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     'cache-control': 'no-store, private',
     'x-robots-tag': 'noindex, nofollow',
     'referrer-policy': 'no-referrer',
+    // A self-contained document with no scripts of its own.
+    'content-security-policy':
+      "default-src 'none'; img-src data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
   };
 
   if (!row || row.expired || !['approved', 'delivered'].includes(row.status)) {

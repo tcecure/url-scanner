@@ -17,7 +17,8 @@ CMD ["npm", "run", "migrate"]
 FROM node:20-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 WORKDIR /app
 RUN groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid app --home /app app

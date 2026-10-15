@@ -1,6 +1,11 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+// Every document is rendered per request so the CSP nonce minted in
+// middleware reaches Next's bootstrap scripts; a prerendered page carries no
+// nonce and its scripts are refused.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'External Exposure Snapshot | TCecure',
   description:

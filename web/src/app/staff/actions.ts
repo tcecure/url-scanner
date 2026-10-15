@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
 import { audit } from '@/lib/audit';
+import { withReviewerSummary } from '@/lib/briefing';
 import { config } from '@/lib/config';
 import { one, query, transaction } from '@/lib/db';
 import { enqueueMail, snapshotReadyBody } from '@/lib/mail';
@@ -102,8 +103,8 @@ export async function approveAndDeliverAction(form: FormData): Promise<void> {
     `SELECT contact_name, contact_email, business_name FROM requests WHERE id = $1 AND deleted_at IS NULL`,
     [requestId],
   );
-  const report = await one<{ id: string; status: string }>(
-    `SELECT id, status::text AS status FROM reports WHERE request_id = $1`,
+  const report = await one<{ id: string; status: string; html: string }>(
+    `SELECT id, status::text AS status, html FROM reports WHERE request_id = $1`,
     [requestId],
   );
   if (!request || !report || !['draft', 'pending_review'].includes(report.status)) return;
@@ -112,12 +113,14 @@ export async function approveAndDeliverAction(form: FormData): Promise<void> {
   const hours = config.reportLinkTtlHours();
 
   await transaction(async (client) => {
+    // The worker's PDF predates the review, so it would contradict the
+    // delivered briefing once the reviewer's summary is written in.
     await client.query(
       `UPDATE reports
           SET status = 'approved', reviewer_notes = $2, reviewed_by = $3, reviewed_at = now(),
-              updated_at = now()
+              html = $4, pdf = NULL, updated_at = now()
         WHERE request_id = $1`,
-      [requestId, notes || null, staff.email],
+      [requestId, notes || null, staff.email, withReviewerSummary(report.html, notes)],
     );
     await client.query(
       `UPDATE tokens SET revoked_at = now()

@@ -91,6 +91,8 @@
 {% if reviewer_notes %}
 <h2>Reviewer's summary</h2>
 <p>{{ reviewer_notes }}</p>
+{% else %}
+<!--tce:reviewer-summary-->
 {% endif %}
 
 {% for category, findings in sections %}
