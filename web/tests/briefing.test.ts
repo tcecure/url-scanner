@@ -18,7 +18,12 @@ describe('withReviewerSummary', () => {
     expect(html).toContain('<p>Second &amp; last</p>');
   });
 
-  it('leaves the document alone when there is no summary or no marker', () => {
+  it('falls back to the first findings section for a report rendered without the marker', () => {
+    const html = withReviewerSummary('<h1>Snapshot</h1>\n<h2>DNS</h2>', 'Looks fine.');
+    expect(html).toBe("<h1>Snapshot</h1>\n<h2>Reviewer's summary</h2>\n<p>Looks fine.</p>\n<h2>DNS</h2>");
+  });
+
+  it('leaves the document alone when there is no summary or nowhere to put it', () => {
     expect(withReviewerSummary(doc, '   ')).toBe(doc);
     expect(withReviewerSummary('<h1>Old report</h1>', 'notes')).toBe('<h1>Old report</h1>');
   });
