@@ -41,9 +41,11 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-    # nginx on the edge terminates TLS and proxies to this port.
+    # nginx on the edge terminates TLS and proxies to this port. On the web VM
+    # set WEB_BIND to the VM's lab address so the edge can reach it; the host
+    # firewall (ops/web-nftables.conf) decides who may.
     ports:
-      - '127.0.0.1:3000:3000'
+      - '${WEB_BIND:-127.0.0.1}:3000:3000'
     depends_on:
       migrate:
         condition: service_completed_successfully

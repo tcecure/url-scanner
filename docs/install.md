@@ -42,6 +42,10 @@ Fill in `.env`. At minimum:
   hashed submitter addresses uncomparable, which is acceptable but noted.
 - `DB_BIND=192.168.60.1` on the web VM so PostgreSQL is reachable from the
   worker network and nowhere else. Never `0.0.0.0`.
+- `WEB_BIND=192.168.1.120` on the web VM so the nginx edge can reach the
+  application. Published container ports bypass the host's input chain, so pair
+  it with `ops/web-nftables.conf`, which admits 3000 from the edge and 5432 from
+  the worker only.
 - `MAIL_TRANSPORT`. Leave as `log` until a TCecure sending identity exists;
   messages are still written to `email_outbox` so the flow is complete and
   auditable, but nothing leaves the network.
