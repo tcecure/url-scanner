@@ -31,7 +31,11 @@ changes the host's network configuration, so it is not done here. Proposed:
       bridge-stp off
       bridge-fd 0
 
-plus NAT for 192.168.60.0/24 out of vmbr0, matching the existing vmbr50 rule.
+plus NAT for 192.168.60.0/24 out of vmbr0, matching the existing vmbr50 rule,
+and ahead of it an exception for the database so the worker keeps its own source
+address there (see docs/install.md):
+
+  iptables -t nat -A POSTROUTING -s 192.168.60.0/24 -d 192.168.1.120 -j RETURN
 EOF
   exit 1
 fi

@@ -24,6 +24,24 @@ Both scripts are idempotent, create nothing that already exists, and never touch
 an existing VM. Read them before running: they print every `qm` command they
 will issue and stop on the first failure.
 
+`provision-worker.sh` refuses to run until `vmbr60` exists; it prints the stanza
+to add to the host's `/etc/network/interfaces` rather than editing host
+networking itself. That stanza masquerades `192.168.60.0/24` out of `vmbr0`,
+with one exception that must come first:
+
+```
+post-up iptables -t nat -A POSTROUTING -s 192.168.60.0/24 -d 192.168.1.120 -j RETURN
+```
+
+Without it the worker reaches the database as the hypervisor's own address, and
+the web VM's policy — which admits 5432 from the worker alone — drops it. The
+exception keeps the worker's source address intact, so the web VM needs a route
+back to the worker network through the hypervisor:
+
+```
+ip route add 192.168.60.0/24 via <pve2 vmbr0 address>
+```
+
 ## 2. Configure
 
 On each VM:
@@ -40,7 +58,7 @@ Fill in `.env`. At minimum:
   VM: `@192.168.1.120:5432`).
 - `IP_HASH_SALT` — `openssl rand -hex 32`. Changing it later makes existing
   hashed submitter addresses uncomparable, which is acceptable but noted.
-- `DB_BIND=192.168.60.1` on the web VM so PostgreSQL is reachable from the
+- `DB_BIND=192.168.1.120` on the web VM so PostgreSQL is reachable from the
   worker network and nowhere else. Never `0.0.0.0`.
 - `WEB_BIND=192.168.1.120` on the web VM so the nginx edge can reach the
   application. Published container ports bypass the host's input chain, so pair
