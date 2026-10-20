@@ -18,6 +18,10 @@ docker compose up -d db
 DATABASE_URL=postgres://tcescan:dev@127.0.0.1:5432/tcescan npm run migrate
 ```
 
+Set `PUBLIC_BASE_URL=http://127.0.0.1:3000` locally. It is the origin written
+into the confirmation links, so leaving it at the deployed value sends anyone
+following a link out of the local outbox to production.
+
 ## Worker
 
 ```
