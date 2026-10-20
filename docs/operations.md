@@ -83,9 +83,10 @@ Use a TCecure-owned domain, never a third party's:
 1. Submit the form at the staging or public URL.
 2. Confirm the email. With `MAIL_TRANSPORT=log`, read the link out of the
    outbox: `docker compose exec -T db psql -U tcescan -c "select to_address, subject, body_text from email_outbox order by id desc limit 1"`.
-3. Publish the TXT record the status page shows, or let a reviewer record
-   authorization manually.
-4. Watch the worker pick up the probe and then the snapshot.
+3. A contact address on the domain being reviewed queues the snapshot as soon as
+   the link is opened. An address on any other domain holds the request for a
+   reviewer, who records the basis on the staff detail page.
+4. Watch the worker pick up the snapshot job.
 5. Preview the briefing from the staff detail page, approve it, and confirm the
    private link resolves once and is refused after it expires.
 

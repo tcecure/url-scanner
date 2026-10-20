@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function VerifyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const { outcome } = await verifyEmail(token);
+  const { outcome, held } = await verifyEmail(token);
 
   return (
     <main>
@@ -15,14 +15,23 @@ export default async function VerifyPage({ params }: { params: Promise<{ token: 
           {outcome === 'verified' ? (
             <>
               <h2>Email confirmed</h2>
-              <p>
-                Thank you. The next step is proving you control the website, so that no review ever
-                runs against a site on someone else&apos;s say-so. Return to the status page from the
-                link you were given when you submitted the request to see how.
-              </p>
+              {held ? (
+                <p>
+                  Thank you. Your address is not on the domain you asked us to review, so a TCecure
+                  reviewer will confirm the authorization with the business before anything runs.
+                  There is nothing further for you to do — no DNS record, no file, and no change to
+                  your website.
+                </p>
+              ) : (
+                <p>
+                  Thank you — that was the last thing we needed. Your review is queued and takes a
+                  couple of minutes; a TCecure analyst then reviews the findings before you are sent
+                  a private briefing link. Nothing is needed from you in the meantime.
+                </p>
+              )}
               <p className="notice">
-                Can&apos;t find your status link? Reply to the confirmation email and a TCecure
-                reviewer will send it again.
+                Your status page shows the progress. Can&apos;t find the link? Reply to the
+                confirmation email and a TCecure reviewer will send it again.
               </p>
             </>
           ) : outcome === 'expired' ? (

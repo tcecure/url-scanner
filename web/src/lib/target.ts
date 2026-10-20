@@ -81,9 +81,9 @@ export function emailDomain(email: string): string {
 /**
  * Does the work email belong to the domain being reviewed?
  *
- * A match is not proof of authority, so it never replaces verification — it
- * decides whether the requester is asked to publish a record, or routed to a
- * TCecure reviewer instead.
+ * A match is not proof of authority. It decides whether the authorization the
+ * requester gave on the form is clear enough to act on, or whether the request
+ * is held for a TCecure reviewer to confirm with the business.
  */
 export function emailMatchesTarget(email: string, domain: string): boolean {
   const mailDomain = emailDomain(email);

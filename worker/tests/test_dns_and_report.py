@@ -95,7 +95,7 @@ REQUEST = {
     "target_domain": "example.test",
     "contact_name": "Dana Reyes",
     "contact_email": "dana@example.test",
-    "authorized_method": "dns_txt",
+    "authorized_method": "contact_confirmation",
     "authorized_at": datetime(2026, 10, 1, 11, 0, tzinfo=timezone.utc),
     "reply_to": "",
 }

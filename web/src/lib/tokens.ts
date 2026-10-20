@@ -18,8 +18,3 @@ export function tokensMatch(a: string, b: string): boolean {
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
 }
-
-/** The verification value a customer publishes to prove they control the site. */
-export function siteVerificationSecret(): string {
-  return randomBytes(24).toString('hex');
-}

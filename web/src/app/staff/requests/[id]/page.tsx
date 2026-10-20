@@ -125,8 +125,9 @@ export default async function StaffRequestPage({ params }: { params: Promise<{ i
 
         {!request.authorized_at && request.email_verified_at ? (
           <div className="card">
-            <h2>Confirm authorization established through sales</h2>
+            <h2>Confirm the authorization with the business</h2>
             <p className="hint">
+              The confirmed address is not on the domain being reviewed, so this request is held.
               Use this only where you have the authorization in hand — a signed engagement, an email
               from the business, or a call you can attest to. Record what it was; this is the record
               that the review was permitted.

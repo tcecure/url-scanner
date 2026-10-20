@@ -15,6 +15,4 @@ export const config = {
   maxRequestsPerIpPerHour: () => Number(env('MAX_REQUESTS_PER_IP_PER_HOUR', '5')),
   maxRequestsPerDomainPerWeek: () => Number(env('MAX_REQUESTS_PER_DOMAIN_PER_WEEK', '2')),
   minFormSeconds: () => Number(env('MIN_FORM_SECONDS', '4')),
-  siteVerificationDnsName: () => env('SITE_VERIFICATION_DNS_NAME', 'tcecure-site-verification'),
-  siteVerificationPath: () => '/.well-known/tcecure-site-verification.txt',
 };

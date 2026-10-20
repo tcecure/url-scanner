@@ -49,19 +49,23 @@ export default function LandingPage() {
             <div className="card">
               <h2>How it works</h2>
               <ol className="steps" style={{ listStyle: 'none' }}>
-                <li><span className="step-no">1</span><span>You submit the form and confirm your email address.</span></li>
-                <li><span className="step-no">2</span><span>You prove you control the website, with a DNS record or a file.</span></li>
+                <li><span className="step-no">1</span><span>You submit the form once — your website and how to reach you.</span></li>
+                <li><span className="step-no">2</span><span>You confirm your email address from the link we send.</span></li>
                 <li><span className="step-no">3</span><span>The review runs — it takes a couple of minutes.</span></li>
                 <li><span className="step-no">4</span><span>A TCecure analyst reviews the findings before anything is sent.</span></li>
                 <li><span className="step-no">5</span><span>You get a private briefing link by email.</span></li>
               </ol>
+              <p className="hint">
+                Nothing to change on your website: no DNS records, no files to upload, no access for us.
+              </p>
             </div>
           </div>
 
           <div className="card" id="request">
             <h2>Request your snapshot</h2>
             <p className="hint">
-              Only someone authorized to speak for the business should submit this request.
+              Only someone authorized to speak for the business should submit this request. Where the
+              authorization is not clear, TCecure confirms it with the business before anything runs.
               Findings are never published and are shared only with you.
             </p>
             <RequestForm />

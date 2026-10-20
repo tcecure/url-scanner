@@ -23,6 +23,8 @@ def claim_job(conn: psycopg.Connection, *, max_attempts: int) -> dict[str, Any] 
 
     SKIP LOCKED lets several workers share the queue without a broker; a job
     whose claim expired is reclaimed so a worker dying mid-check is not fatal.
+    Only snapshots are claimed, so a job of a kind this worker no longer runs is
+    left where it is rather than observed as something else.
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -35,7 +37,8 @@ def claim_job(conn: psycopg.Connection, *, max_attempts: int) -> dict[str, Any] 
                    updated_at  = now()
              WHERE j.id = (
                    SELECT id FROM jobs
-                    WHERE (status = 'queued'
+                    WHERE kind = 'snapshot'
+                      AND (status = 'queued'
                            OR (status = 'running' AND claim_expires_at < now()))
                       AND attempts < %(max_attempts)s
                     ORDER BY created_at
@@ -51,7 +54,7 @@ def claim_job(conn: psycopg.Connection, *, max_attempts: int) -> dict[str, Any] 
             return None
         cur.execute(
             "SELECT id, business_name, target_domain, contact_name, contact_email, status,"
-            "       verification_secret, authorized_at, email_verified_at"
+            "       authorized_at, email_verified_at"
             "  FROM requests WHERE id = %s",
             (job["request_id"],),
         )
@@ -81,45 +84,6 @@ def finish_job(conn: psycopg.Connection, job_id: int, *, status: str, error: str
             "UPDATE jobs SET status = %s, error = %s, finished_at = now(), updated_at = now() WHERE id = %s",
             (status, error, job_id),
         )
-
-
-def mark_authorized(conn: psycopg.Connection, request_id: str, *, method: str,
-                    evidence: dict[str, Any]) -> None:
-    """Record proven control of the website and let the snapshot proceed."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE requests
-               SET authorized_at = coalesce(authorized_at, now()),
-                   authorized_method = %(method)s,
-                   authorized_by = 'self-service',
-                   authorization_evidence = %(evidence)s,
-                   status = CASE WHEN status = 'awaiting_authorization'
-                                 THEN 'queued'::request_status ELSE status END,
-                   updated_at = now()
-             WHERE id = %(request_id)s AND email_verified_at IS NOT NULL
-            """,
-            {"request_id": request_id, "method": method, "evidence": Jsonb(evidence)},
-        )
-
-
-def queue_snapshot(conn: psycopg.Connection, request_id: str, *, timeout_seconds: int) -> int | None:
-    """Queue the one snapshot an authorized request is entitled to."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO jobs (request_id, kind, status, timeout_seconds)
-                 SELECT %(request_id)s, 'snapshot', 'queued', %(timeout_seconds)s
-                  WHERE EXISTS (SELECT 1 FROM requests
-                                 WHERE id = %(request_id)s AND authorized_at IS NOT NULL)
-                    AND NOT EXISTS (SELECT 1 FROM jobs
-                                     WHERE request_id = %(request_id)s AND kind = 'snapshot')
-              RETURNING id
-            """,
-            {"request_id": request_id, "timeout_seconds": timeout_seconds},
-        )
-        row = cur.fetchone()
-    return row["id"] if row else None
 
 
 def set_request_status(conn: psycopg.Connection, request_id: str, status: str) -> None:

@@ -51,23 +51,32 @@ no brute force, no authenticated checks.
 
 ## Authorization
 
-An observation runs only after both are true: the email address is confirmed,
-and control of the website is proven by a DNS TXT record or a file under
-`/.well-known/`. A reviewer may instead record that authorization was
-established through sales, which is written to the audit trail with the
-reviewer's identity and a required written basis. There is no path that reaches
-a customer's website without one of those three.
+An observation runs only after the authorization box is ticked on the form and
+the contact address is confirmed from a link. Confirming the address is the
+only thing asked of the requester: the service never asks anyone to change DNS,
+publish a file, or give it access to a website, because a marketing form that
+asks for those things is one most legitimate prospects abandon and only a
+determined attacker completes.
 
-The verification secret is per-request and random. The web tier never makes the
-probe itself — it queues an `authorization_probe` job, so the only process with
-an outbound path remains the worker.
+What a confirmed address establishes depends on where it sits. On the domain
+being reviewed, it ties the authorization statement to someone reachable at that
+domain and the snapshot is queued. Anywhere else the authorization is unclear,
+and the request is held in `awaiting_authorization` with a reviewer alerted:
+nothing is observed until a reviewer confirms the authorization with the
+business and records the written basis, which goes to the audit trail with the
+reviewer's identity. Neither path is described to the customer as proof that
+they control the domain, because neither is.
+
+So there are exactly two ways a request reaches a customer's website, and a
+reviewer is in the loop for the weaker one. The web tier still makes no outbound
+request of its own: it queues a snapshot job, and the worker remains the only
+process with an outbound path.
 
 ## Abuse controls
 
 Rate limits are enforced in the database, per submitter IP per hour, per email
-address per day and per domain per week, plus a separate limit on authorization
-probes. The form carries a honeypot field and a minimum completion time, so the
-cheapest bots are refused without a limit being consumed. Submitter IPs are
+address per day and per domain per week. The form carries a honeypot field and
+a minimum completion time, so the cheapest bots are refused without a limit being consumed. Submitter IPs are
 stored only as a salted hash.
 
 ## Privacy and disclosure
@@ -76,5 +85,5 @@ Findings are never displayed publicly and never indexed: staff pages and the
 briefing preview are `no-store` and `noindex`, and the customer's copy is a
 private link that expires. Unknown and expired links get the same generic
 response, so a link cannot be probed for existence. Every state change —
-submission, confirmation, verification, manual approval, preview, approval,
-delivery, purge — is recorded in the audit trail.
+submission, confirmation, authorization (recorded or held), manual approval,
+preview, approval, delivery, purge — is recorded in the audit trail.

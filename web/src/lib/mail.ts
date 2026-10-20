@@ -6,7 +6,7 @@ export type Mail = {
   subject: string;
   body: string;
   requestId?: string | null;
-  kind: 'verify_email' | 'authorization_pending' | 'snapshot_ready' | 'reviewer_alert';
+  kind: 'verify_email' | 'snapshot_ready' | 'reviewer_alert';
 };
 
 /**
@@ -43,9 +43,29 @@ You asked TCecure for a free External Exposure Snapshot for ${business}.
 Confirm this address to continue:
 ${link}
 
-The link stops working in ${config.verifyTokenTtlHours()} hours. If you did not ask for
-this review, ignore this message and nothing further happens — no review is
-performed until the address is confirmed and control of the website is proven.
+That is the only step we need from you — there is nothing to change on your
+website or your DNS. The link stops working in ${config.verifyTokenTtlHours()} hours. If you did not ask
+for this review, ignore this message and nothing further happens: no review
+runs until the address is confirmed.
+${SIGNOFF}`;
+}
+
+export function staffAuthorizationBody(
+  business: string,
+  domain: string,
+  contactEmail: string,
+  staffUrl: string,
+): string {
+  return `A snapshot request is held for an authorization decision.
+
+Business: ${business}
+Domain:   ${domain}
+Contact:  ${contactEmail}
+
+The confirmed email address is not on the domain being reviewed, so the
+authorization is unclear and nothing has been observed. Confirm the
+authorization with the business, then record the basis in the review queue:
+${staffUrl}
 ${SIGNOFF}`;
 }
 

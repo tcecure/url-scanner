@@ -3,9 +3,10 @@
 A free, authorization-gated snapshot of what a business already publishes to the
 public internet, offered by TCecure at `scan.tcecure.com`. A prospect asks for a
 review of their own website; the service confirms the request came from them,
-confirms they control the website, runs a short fixed list of public
-observations, and a TCecure reviewer approves the briefing before anything is
-delivered.
+runs a short fixed list of public observations, and a TCecure reviewer approves
+the briefing before anything is delivered. The form is deliberately low
+friction: the requester submits once and is never asked to change DNS, publish a
+file or give TCecure access to anything.
 
 It is **not** a penetration test and not a vulnerability scanner. There is no
 crawling, no port scanning, no exploitation and no authenticated testing, and
@@ -29,11 +30,13 @@ reported as absent, never as a proven vulnerability.
 
 1. The prospect submits their business, website, name and work email, ticks the
    authorization box, and optionally opts in to marketing contact.
-2. They confirm the email address from a link.
-3. They prove control of the website by publishing a DNS TXT record
-   (`tcecure-site-verification=<secret>`) or a file at
-   `/.well-known/tcecure-site-verification.txt`. A TCecure reviewer can instead
-   record authorization established through sales.
+2. They confirm the email address from a link. That is the last thing asked of
+   them.
+3. A confirmed work email on the domain being reviewed carries the
+   authorization given on the form, and the snapshot is queued. Anything else —
+   an address on another domain — is unclear: the request is held, a reviewer is
+   alerted, and nothing is observed until that reviewer records the basis on
+   which the business authorized the review.
 4. The worker runs the observations above, bounded in time, size and redirects.
 5. A reviewer reads the briefing, approves it, and delivery goes out as a
    private expiring link from a TCecure address. Nothing is sent before that.

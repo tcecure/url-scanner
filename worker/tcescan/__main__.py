@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import authorization, db, mailer, report
+from . import db, mailer, report
 from .checks import run_all
 from .config import Config
 
@@ -51,44 +51,8 @@ def process_one(cfg: Config) -> bool:
         job = db.claim_job(conn, max_attempts=cfg.max_attempts)
         if job is None:
             return False
-        if job["kind"] == "authorization_probe":
-            _run_authorization_probe(conn, cfg, job)
-            return True
         _run_snapshot(conn, cfg, job)
     return True
-
-
-def _run_authorization_probe(conn, cfg: Config, job: dict) -> None:
-    """Look for the verification value the customer was asked to publish.
-
-    Not finding it is an ordinary outcome, not a failure: the customer may still
-    be waiting on DNS to propagate, and can ask again.
-    """
-    request = job["request"]
-    request_id = str(request["id"])
-    domain = request["target_domain"]
-    try:
-        check = authorization.verify(domain, request["verification_secret"], nameservers=cfg.resolvers)
-    except Exception as exc:
-        db.finish_job(conn, job["id"], status="failed", error=f"{type(exc).__name__}: {exc}")
-        db.audit(conn, request_id=request_id, action="authorization.probe_error", actor="worker",
-                 detail={"job_id": job["id"], "error": type(exc).__name__})
-        conn.commit()
-        log.exception("job %s: authorization probe of %s errored", job["id"], domain)
-        return
-
-    if check.verified:
-        db.mark_authorized(conn, request_id, method=check.method, evidence=check.evidence)
-        snapshot_job = db.queue_snapshot(conn, request_id, timeout_seconds=cfg.job_timeout_seconds)
-        db.audit(conn, request_id=request_id, action="authorization.verified", actor="worker",
-                 detail={"method": check.method, "snapshot_job": snapshot_job})
-        log.info("job %s: %s verified by %s; snapshot queued", job["id"], domain, check.method)
-    else:
-        db.audit(conn, request_id=request_id, action="authorization.not_found", actor="worker",
-                 detail={"job_id": job["id"], "evidence": check.evidence})
-        log.info("job %s: no verification value published for %s yet", job["id"], domain)
-    db.finish_job(conn, job["id"], status="succeeded")
-    conn.commit()
 
 
 def _run_snapshot(conn, cfg: Config, job: dict) -> None:

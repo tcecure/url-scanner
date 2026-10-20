@@ -3,12 +3,12 @@ import { z } from 'zod';
 import { config } from '@/lib/config';
 import { audit, hashIp } from '@/lib/audit';
 import { one, query, transaction } from '@/lib/db';
-import { enqueueMail, verifyEmailBody } from '@/lib/mail';
+import { enqueueMail, staffAuthorizationBody, verifyEmailBody } from '@/lib/mail';
 import { consume } from '@/lib/rate-limit';
-import { hashToken, newToken, siteVerificationSecret } from '@/lib/tokens';
+import { hashToken, newToken } from '@/lib/tokens';
 import { TargetRejected, emailMatchesTarget, isConsumerMailbox, normalizeDomain } from '@/lib/target';
 
-export const PRIVACY_VERSION = '2026-10-01';
+export const PRIVACY_VERSION = '2026-10-20';
 
 export const submissionSchema = z.object({
   businessName: z.string().trim().min(2, 'Enter your business name.').max(200),
@@ -91,17 +91,18 @@ export async function createRequest(
 
   const statusToken = newToken();
   const verifyToken = newToken();
-  // Email domain matching the target is the ordinary case; anyone else is routed
-  // to a TCecure reviewer, who confirms the authorization came through sales.
+  // A work email on the domain is the ordinary case and the review proceeds on
+  // the submitter's authorization statement. Anything else is unclear, and is
+  // held for a TCecure reviewer to confirm with the business.
   const requiresStaffApproval = !emailMatchesTarget(data.contactEmail, domain);
 
   const requestId = await transaction(async (client) => {
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO requests (business_name, website_input, target_domain, contact_name, contact_email,
-                             status, authorization_confirmed, marketing_consent, verification_secret,
+                             status, authorization_confirmed, marketing_consent,
                              status_token_hash, privacy_version, source_ip_hash, user_agent, delete_after)
-            VALUES ($1, $2, $3, $4, $5, 'awaiting_email_verification', true, $6, $7, $8, $9, $10, $11,
-                    now() + make_interval(days => $12))
+            VALUES ($1, $2, $3, $4, $5, 'awaiting_email_verification', true, $6, $7, $8, $9, $10,
+                    now() + make_interval(days => $11))
          RETURNING id`,
       [
         data.businessName,
@@ -110,7 +111,6 @@ export async function createRequest(
         data.contactName,
         data.contactEmail,
         data.marketingConsent,
-        siteVerificationSecret(),
         hashToken(statusToken),
         PRIVACY_VERSION,
         hashIp(context.ip),
@@ -157,22 +157,28 @@ export type RequestRow = {
   email_verified_at: Date | null;
   authorized_at: Date | null;
   authorized_method: string | null;
-  verification_secret: string;
   created_at: Date;
 };
 
 export async function byStatusToken(token: string): Promise<RequestRow | null> {
   return one<RequestRow>(
     `SELECT id, business_name, target_domain, contact_name, contact_email, status, email_verified_at,
-            authorized_at, authorized_method, verification_secret, created_at
+            authorized_at, authorized_method, created_at
        FROM requests
       WHERE status_token_hash = $1 AND deleted_at IS NULL`,
     [hashToken(token)],
   );
 }
 
-/** Consume an email verification link. Idempotent for a second click on the same link. */
-export async function verifyEmail(token: string): Promise<{ statusToken?: string; outcome: string }> {
+/**
+ * Consume an email verification link. Idempotent for a second click on the same link.
+ *
+ * Confirming the address is the last thing the requester is asked to do. A
+ * confirmed work email on the domain being reviewed carries the authorization
+ * statement from the form and the snapshot is queued; anything else leaves the
+ * request unauthorized and waiting on a TCecure reviewer.
+ */
+export async function verifyEmail(token: string): Promise<{ outcome: string; held?: boolean }> {
   const row = await one<{ request_id: string; used_at: Date | null; expired: boolean }>(
     `SELECT request_id, used_at, expires_at < now() AS expired
        FROM tokens
@@ -181,6 +187,16 @@ export async function verifyEmail(token: string): Promise<{ statusToken?: string
   );
   if (!row) return { outcome: 'unknown' };
   if (row.expired && !row.used_at) return { outcome: 'expired' };
+
+  const request = await one<{ contact_email: string; target_domain: string; business_name: string }>(
+    `SELECT contact_email, target_domain, business_name FROM requests WHERE id = $1`,
+    [row.request_id],
+  );
+  if (!request) return { outcome: 'unknown' };
+  const selfService = emailMatchesTarget(request.contact_email, request.target_domain);
+  // A second click on the same link shows the same page, but must not write the
+  // audit trail again or alert a reviewer twice about one request.
+  const firstUse = !row.used_at;
 
   await transaction(async (client) => {
     await client.query(`UPDATE tokens SET used_at = coalesce(used_at, now()) WHERE token_hash = $1`, [
@@ -195,27 +211,60 @@ export async function verifyEmail(token: string): Promise<{ statusToken?: string
         WHERE id = $1`,
       [row.request_id],
     );
+    if (selfService) {
+      await client.query(
+        `UPDATE requests
+            SET authorized_at = coalesce(authorized_at, now()),
+                authorized_method = coalesce(authorized_method, 'contact_confirmation'),
+                authorized_by = coalesce(authorized_by, contact_email),
+                authorization_evidence = coalesce(
+                  authorization_evidence,
+                  jsonb_build_object(
+                    'basis', 'authorization statement accepted on the request form',
+                    'contact_email_domain', split_part(contact_email, '@', 2),
+                    'target_domain', target_domain,
+                    'confirmed_at', now()
+                  )),
+                status = CASE WHEN status = 'awaiting_authorization' THEN 'queued'::request_status
+                              ELSE status END,
+                updated_at = now()
+          WHERE id = $1 AND email_verified_at IS NOT NULL`,
+        [row.request_id],
+      );
+      await client.query(
+        `INSERT INTO jobs (request_id, kind, status)
+              SELECT $1, 'snapshot', 'queued'
+               WHERE EXISTS (SELECT 1 FROM requests WHERE id = $1 AND authorized_at IS NOT NULL)
+                 AND NOT EXISTS (SELECT 1 FROM jobs WHERE request_id = $1 AND kind = 'snapshot')`,
+        [row.request_id],
+      );
+    }
   });
-  await audit('request.email_verified', { requestId: row.request_id });
-  return { outcome: 'verified' };
-}
 
-/**
- * Ask the worker to look for the published verification value. The check itself
- * never runs in the web tier, which has no business making outbound requests.
- */
-export async function queueAuthorizationProbe(requestId: string): Promise<boolean> {
-  const rows = await query<{ id: string }>(
-    `INSERT INTO jobs (request_id, kind, status)
-          SELECT $1, 'authorization_probe', 'queued'
-           WHERE EXISTS (SELECT 1 FROM requests
-                          WHERE id = $1 AND email_verified_at IS NOT NULL AND authorized_at IS NULL)
-             AND NOT EXISTS (SELECT 1 FROM jobs
-                              WHERE request_id = $1 AND kind = 'authorization_probe'
-                                AND status IN ('queued', 'running'))
-       RETURNING id`,
-    [requestId],
-  );
-  if (rows.length) await audit('authorization.probe_queued', { requestId });
-  return rows.length > 0;
+  if (!firstUse) return { outcome: 'verified', held: !selfService };
+
+  await audit('request.email_verified', { requestId: row.request_id });
+  if (selfService) {
+    await audit('authorization.recorded', {
+      actor: request.contact_email,
+      requestId: row.request_id,
+      detail: { method: 'contact_confirmation' },
+    });
+    return { outcome: 'verified', held: false };
+  }
+
+  await audit('authorization.held_for_staff', { requestId: row.request_id });
+  await enqueueMail({
+    requestId: row.request_id,
+    kind: 'reviewer_alert',
+    to: config.reviewerInbox(),
+    subject: `Authorization to confirm: ${request.business_name} (${request.target_domain})`,
+    body: staffAuthorizationBody(
+      request.business_name,
+      request.target_domain,
+      request.contact_email,
+      `${config.publicBaseUrl()}/staff`,
+    ),
+  });
+  return { outcome: 'verified', held: true };
 }

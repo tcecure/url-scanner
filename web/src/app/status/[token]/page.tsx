@@ -1,20 +1,17 @@
 import { notFound } from 'next/navigation';
 
-import AuthorizationCheck from '@/components/AuthorizationCheck';
-import { config } from '@/lib/config';
 import { byStatusToken } from '@/lib/requests';
-import { emailMatchesTarget } from '@/lib/target';
 
 export const dynamic = 'force-dynamic';
 
 const STAGES: Record<string, { label: string; blurb: string }> = {
   awaiting_email_verification: {
     label: 'Waiting on your email confirmation',
-    blurb: 'We sent a confirmation link to your work email. Open it to continue.',
+    blurb: 'We sent a confirmation link to your work email. Open it and the review begins.',
   },
   awaiting_authorization: {
-    label: 'Waiting on website verification',
-    blurb: 'Publish one of the two values below so we can confirm you control the site.',
+    label: 'With a TCecure reviewer',
+    blurb: 'A TCecure reviewer is confirming the authorization for this request before anything runs.',
   },
   queued: { label: 'Queued', blurb: 'Your review is in the queue and starts shortly.' },
   running: { label: 'Review in progress', blurb: 'We are observing your public records now.' },
@@ -43,9 +40,8 @@ export default async function StatusPage({ params }: { params: Promise<{ token: 
   if (!request) notFound();
 
   const stage = STAGES[request.status] ?? { label: request.status, blurb: '' };
-  const needsStaff = !emailMatchesTarget(request.contact_email, request.target_domain);
-  const dnsName = `${config.siteVerificationDnsName()}.${request.target_domain}`;
-  const dnsValue = `${config.siteVerificationDnsName()}=${request.verification_secret}`;
+  const heldForStaff =
+    request.status === 'awaiting_authorization' && Boolean(request.email_verified_at) && !request.authorized_at;
 
   return (
     <main>
@@ -67,8 +63,7 @@ export default async function StatusPage({ params }: { params: Promise<{ token: 
             <li>
               <span className="step-no">1</span>
               <span>
-                Request received{' '}
-                <span className="pill pill-done">done</span>
+                Request received <span className="pill pill-done">done</span>
               </span>
             </li>
             <li>
@@ -85,19 +80,6 @@ export default async function StatusPage({ params }: { params: Promise<{ token: 
             <li>
               <span className="step-no">3</span>
               <span>
-                Website control verified{' '}
-                {request.authorized_at ? (
-                  <span className="pill pill-done">
-                    {request.authorized_method === 'staff_approval' ? 'approved by TCecure' : 'done'}
-                  </span>
-                ) : (
-                  <span className="pill pill-wait">{needsStaff ? 'with TCecure' : 'waiting on you'}</span>
-                )}
-              </span>
-            </li>
-            <li>
-              <span className="step-no">4</span>
-              <span>
                 Public review{' '}
                 {['awaiting_review', 'delivered'].includes(request.status) ? (
                   <span className="pill pill-done">done</span>
@@ -107,7 +89,7 @@ export default async function StatusPage({ params }: { params: Promise<{ token: 
               </span>
             </li>
             <li>
-              <span className="step-no">5</span>
+              <span className="step-no">4</span>
               <span>
                 Analyst review and delivery{' '}
                 {request.status === 'delivered' ? (
@@ -118,36 +100,23 @@ export default async function StatusPage({ params }: { params: Promise<{ token: 
               </span>
             </li>
           </ul>
+          <p className="hint">Nothing else is needed from you — there is no DNS record or file to publish.</p>
         </div>
 
-        {request.email_verified_at && !request.authorized_at ? (
-          needsStaff ? (
-            <div className="card">
-              <h2>A TCecure reviewer is confirming your authorization</h2>
-              <p>
-                Your email address is not on <span className="mono">{request.target_domain}</span>, so we
-                do not assume it speaks for the business. A TCecure reviewer will confirm the
-                authorization with you directly before the review runs. Nothing happens to your site in
-                the meantime.
-              </p>
-              <p className="hint">
-                If you do control the domain, you can also publish either value below and the review
-                proceeds without waiting for us.
-              </p>
-              <VerificationInstructions dnsName={dnsName} dnsValue={dnsValue} secret={request.verification_secret} />
-              <AuthorizationCheck statusToken={token} />
-            </div>
-          ) : (
-            <div className="card">
-              <h2>Prove you control the website</h2>
-              <p>
-                Choose whichever is easier. Once it is live, use the button below — we look for it, and
-                the review starts on its own.
-              </p>
-              <VerificationInstructions dnsName={dnsName} dnsValue={dnsValue} secret={request.verification_secret} />
-              <AuthorizationCheck statusToken={token} />
-            </div>
-          )
+        {heldForStaff ? (
+          <div className="card">
+            <h2>A TCecure reviewer is confirming your authorization</h2>
+            <p>
+              Your email address is not on <span className="mono">{request.target_domain}</span>, so the
+              authorization for this request is not clear enough to act on. A TCecure reviewer will
+              confirm it with the business directly before the review runs. Nothing happens to your site
+              in the meantime, and there is nothing for you to publish or change.
+            </p>
+            <p className="hint">
+              If this is urgent, reply to your confirmation email and say who at the business authorized
+              the review.
+            </p>
+          </div>
         ) : null}
 
         <div className="card">
@@ -161,32 +130,5 @@ export default async function StatusPage({ params }: { params: Promise<{ token: 
         </div>
       </div>
     </main>
-  );
-}
-
-function VerificationInstructions({
-  dnsName,
-  dnsValue,
-  secret,
-}: {
-  dnsName: string;
-  dnsValue: string;
-  secret: string;
-}) {
-  return (
-    <>
-      <h3>Option 1 — a DNS TXT record</h3>
-      <p className="hint">Add this at your DNS provider. It can be removed once verification completes.</p>
-      <pre>{`Type:  TXT
-Name:  ${dnsName}
-Value: ${dnsValue}`}</pre>
-
-      <h3>Option 2 — a file on your website</h3>
-      <p className="hint">
-        Publish a text file at this path containing only the value. Either http or https is fine.
-      </p>
-      <pre>{`Path:     ${config.siteVerificationPath()}
-Contents: ${secret}`}</pre>
-    </>
   );
 }

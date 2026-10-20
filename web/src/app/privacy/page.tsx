@@ -54,9 +54,13 @@ export default function PrivacyPage() {
 
           <h2>Authorization</h2>
           <p>
-            No review runs until you confirm your email address and either prove control of the website
-            or have your authorization confirmed by a TCecure reviewer. Your authorization statement,
-            the method used and the time it was established are recorded with the request.
+            No review runs until you confirm your email address. The service never asks you to change
+            your DNS, publish a file, or give TCecure any access to your website. Where the
+            authorization is not clear — for example the confirmed address is not on the domain being
+            reviewed — the request is held and a TCecure reviewer confirms the authorization with the
+            business before anything is observed. Your authorization statement, how it was established
+            and the time it was recorded are kept with the request, and no findings are released until
+            a TCecure analyst has reviewed them.
           </p>
 
           <h2>Marketing</h2>
