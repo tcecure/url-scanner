@@ -1,0 +1,27 @@
+# Runs on the isolated worker VM. The worker reaches only the database on the
+# web VM and public ports 80/443/53; everything else is denied in the VM's own
+# nftables rules as well as in the application's SSRF guard.
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Resolvers are public on purpose: the lab's own resolvers would answer for
+      # internal names, which this service must never be able to reach.
+      PUBLIC_RESOLVERS: ${PUBLIC_RESOLVERS:-1.1.1.1,8.8.8.8}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'

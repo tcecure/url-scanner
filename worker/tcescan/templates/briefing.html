@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>External Exposure Snapshot — {{ request.business_name }}</title>
+<style>
+  @page { size: letter; margin: 18mm 16mm 20mm; @bottom-center {
+    content: "TCecure — External Exposure Snapshot — page " counter(page) " of " counter(pages);
+    font: 8pt "Helvetica Neue", Arial, sans-serif; color: #6b7280; } }
+  * { box-sizing: border-box; }
+  body { font: 10.5pt/1.5 "Helvetica Neue", Arial, sans-serif; color: #1f2430; margin: 0; }
+  .band { background: #282973; color: #fff; padding: 22px 24px; display: flex;
+          justify-content: space-between; align-items: flex-end; }
+  .band h1 { font-size: 19pt; margin: 0 0 4px; font-weight: 600; letter-spacing: -0.2px; }
+  .band p { margin: 0; color: #c9cbe8; font-size: 9.5pt; }
+  .band img { height: 34px; }
+  .meta { width: 100%; border-collapse: collapse; margin: 18px 0 8px; font-size: 9.5pt; }
+  .meta th { text-align: left; color: #6b7280; font-weight: 500; width: 150px; padding: 3px 0; }
+  .meta td { padding: 3px 0; }
+  h2 { font-size: 12.5pt; color: #282973; margin: 22px 0 8px; padding-bottom: 5px;
+       border-bottom: 2px solid #f78a1e; }
+  h3 { font-size: 11pt; margin: 16px 0 6px; }
+  .cards { display: flex; gap: 10px; margin: 14px 0 4px; }
+  .card { flex: 1; border: 1px solid #e3e5ee; border-radius: 6px; padding: 10px 12px; }
+  .card b { display: block; font-size: 17pt; color: #282973; line-height: 1.1; }
+  .card span { font-size: 8.5pt; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; }
+  .finding { border: 1px solid #e3e5ee; border-left: 4px solid #9aa0b5; border-radius: 5px;
+             padding: 10px 12px; margin: 8px 0; page-break-inside: avoid; }
+  .finding.attention { border-left-color: #c23b22; }
+  .finding.consider { border-left-color: #f78a1e; }
+  .finding.informational { border-left-color: #2f8f5b; }
+  .finding header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .finding h4 { margin: 0; font-size: 10.5pt; }
+  .tag { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px;
+         border-radius: 10px; background: #eef0f6; color: #434a60; white-space: nowrap; }
+  .finding p { margin: 6px 0 0; }
+  .rec { margin-top: 7px; padding: 7px 9px; background: #fbf6ef; border-radius: 4px; font-size: 9.5pt; }
+  .rec b { color: #9a5a10; }
+  .evidence { margin-top: 7px; font-size: 8.5pt; color: #4b5162; }
+  .evidence code { background: #f4f5f9; padding: 1px 4px; border-radius: 3px;
+                   word-break: break-all; font-size: 8pt; }
+  .note { background: #f4f5f9; border-radius: 6px; padding: 12px 14px; font-size: 9.5pt; margin: 14px 0; }
+  .cta { background: #282973; color: #fff; border-radius: 6px; padding: 16px 18px; margin: 20px 0 6px; }
+  .cta h2 { color: #fff; border-bottom-color: #f78a1e; margin-top: 0; }
+  .cta a { color: #ffb251; }
+  footer { margin-top: 18px; font-size: 8.5pt; color: #6b7280; border-top: 1px solid #e3e5ee; padding-top: 10px; }
+</style>
+</head>
+<body>
+<div class="band">
+  <div>
+    <h1>External Exposure Snapshot</h1>
+    <p>Business posture briefing prepared for {{ request.business_name }}</p>
+  </div>
+  {% if logo_data_uri %}<img src="{{ logo_data_uri }}" alt="TCecure">{% endif %}
+</div>
+
+<table class="meta">
+  <tr><th>Business</th><td>{{ request.business_name }}</td></tr>
+  <tr><th>Website reviewed</th><td>{{ request.target_domain }}</td></tr>
+  <tr><th>Prepared for</th><td>{{ request.contact_name }}</td></tr>
+  <tr><th>Observations made</th><td>{{ observed_from|ts }} &ndash; {{ observed_to|ts }}</td></tr>
+  <tr><th>Briefing prepared</th><td>{{ generated_at|ts }}</td></tr>
+  <tr><th>Authorization</th><td>
+    {% if request.authorized_method == 'dns_txt' %}Confirmed by DNS record published on the domain
+    {% elif request.authorized_method == 'well_known' %}Confirmed by verification file published on the website
+    {% elif request.authorized_method == 'staff_approval' %}Confirmed with TCecure staff
+    {% else %}Confirmed by the requester{% endif %}
+    on {{ request.authorized_at|ts }}</td></tr>
+</table>
+
+<div class="cards">
+  <div class="card"><b>{{ counts.total }}</b><span>Observations</span></div>
+  <div class="card"><b>{{ counts.attention }}</b><span>Worth attention</span></div>
+  <div class="card"><b>{{ counts.consider }}</b><span>Worth considering</span></div>
+  <div class="card"><b>{{ counts.observed }}</b><span>Already in place</span></div>
+</div>
+
+<div class="note">
+  <b>What this is.</b> TCecure looked only at information your domain and website publish to anyone on the
+  internet &mdash; public DNS records, your email policy records, how the site answers a request for its home
+  page, and the certificate it presents. Nothing was logged into, no vulnerability was tested, and no part of
+  your systems was probed. This is not a penetration test or a comprehensive vulnerability assessment.
+  <br><br>
+  <b>How to read it.</b> Each item below separates what was <em>observed</em> &mdash; a fact, with the evidence
+  that supports it &mdash; from the <em>recommendation</em>, which is our advice. Where a protective measure was
+  not seen, that is recorded as an absence, not as a proven weakness: it may be handled elsewhere in your
+  environment.
+</div>
+
+{% if reviewer_notes %}
+<h2>Reviewer's summary</h2>
+<p>{{ reviewer_notes }}</p>
+{% else %}
+<!--tce:reviewer-summary-->
+{% endif %}
+
+{% for category, findings in sections %}
+<h2>{{ category }}</h2>
+{% for f in findings %}
+<div class="finding {{ f.severity_hint }}">
+  <header>
+    <h4>{{ f.title }}</h4>
+    <span class="tag">{% if f.outcome == 'observed' %}Observed
+      {% elif f.outcome == 'absent' %}Not observed
+      {% elif f.outcome == 'error' %}Not completed
+      {% else %}Not applicable{% endif %}</span>
+  </header>
+  <p>{{ f.summary }}</p>
+  {% if f.recommendation %}<div class="rec"><b>Recommendation.</b> {{ f.recommendation }}</div>{% endif %}
+  <div class="evidence">
+    Evidence recorded {{ f.observed_at|ts }}{% if f.evidence %} &mdash;
+    {% for key, value in f.evidence.items() %}{% if value %}<code>{{ key }}: {{ value }}</code> {% endif %}{% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endfor %}
+
+<div class="cta">
+  <h2>Where TCecure can take this further</h2>
+  <p>A snapshot of what the internet can see is a starting point, not an assessment. A paid TCecure engagement
+  reviews what this cannot reach: your internal systems and email configuration in depth, your cloud and
+  identity setup, the controls behind your website, and &mdash; where it applies to your business &mdash; your
+  readiness against the frameworks your customers and contracts ask about, including CMMC.</p>
+  <p><b>To discuss an assessment, reply to the message that delivered this briefing, or contact TCecure at
+  <a href="mailto:{{ request.reply_to or 'info@tcecure.com' }}">{{ request.reply_to or 'info@tcecure.com' }}</a>.</b></p>
+</div>
+
+<footer>
+  Prepared by TCecure. This briefing is confidential to {{ request.business_name }} and reflects only what was
+  publicly observable at the times recorded above; a system's posture can change at any time. TCecure performed
+  no authenticated testing, no port scanning and no exploitation of any kind in producing it.
+</footer>
+</body>
+</html>
