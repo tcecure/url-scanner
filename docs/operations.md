@@ -21,16 +21,23 @@ that reverses it; see [rollback](#rollback).
 The database holds requests, findings, rendered briefings, the audit trail and
 staff accounts. Everything else is rebuildable from the repository.
 
+`ops/backup-db.sh` takes the dump. On VM120 it is installed as
+`/usr/local/sbin/tcescan-backup-db` and run nightly at 02:15 UTC by
+`/etc/cron.d/tcescan-backup`, writing to `/var/backups/tcescan` and deleting
+dumps older than `KEEP_DAYS` (14).
+
 ```
-docker compose exec -T db pg_dump -U tcescan -Fc tcescan > /var/backups/tcescan-$(date +%F).dump
+sudo install -o root -g root -m 0700 ops/backup-db.sh /usr/local/sbin/tcescan-backup-db
+sudo COMPOSE_DIR=/opt/tcescan /usr/local/sbin/tcescan-backup-db      # verify once by hand
 ```
 
-Run it nightly from cron on the web VM and keep 14 days. Dumps contain customer
-contact details and briefing content: store them with the same care as the
-database, and prune them on the same retention clock as the data itself.
+The directory and the dumps are root-only, because a dump holds customer
+contact details and briefing content. 14 days is deliberately shorter than
+`RETENTION_DAYS`: a deletion request is honoured in the database at once, and
+the copy of it in a dump ages out instead of being edited.
 
-Proxmox-level backups of VM120 cover the volume as well, but a logical dump is
-what a restore should normally use.
+There are no Proxmox-level backup jobs for VM120; the logical dump is the only
+backup, and it is what a restore should use.
 
 ## Restore
 
@@ -38,7 +45,7 @@ what a restore should normally use.
 docker compose stop web
 docker compose exec -T db dropdb -U tcescan tcescan
 docker compose exec -T db createdb -U tcescan tcescan
-docker compose exec -T db pg_restore -U tcescan -d tcescan < /var/backups/tcescan-YYYY-MM-DD.dump
+docker compose exec -T db pg_restore -U tcescan -d tcescan < /var/backups/tcescan/tcescan-<stamp>.dump
 docker compose run --rm migrate      # applies anything newer than the dump
 docker compose start web
 ```
@@ -71,10 +78,13 @@ migration rather than restoring a dump, unless data was lost.
 
 ## Retention and deletion
 
-Requests, findings, briefings and outbox rows are deleted `RETENTION_DAYS` after
-the request completes. A reviewer can also purge a single request immediately
-from its detail page, which removes the customer's data and leaves only the
-audit record that a purge happened.
+Requests, findings, briefings and the mail sent about them are deleted
+`RETENTION_DAYS` after the request completes, by the worker's purge pass. A
+reviewer can also purge a single request immediately from its detail page: the
+briefing, findings and mail go, the contact details are overwritten, and what
+remains is the audit record that the review was authorized and then purged.
+Dumps taken before a deletion still hold the data until they age out (see
+[backup](#backup)).
 
 ## Verifying a deployment
 

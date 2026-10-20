@@ -162,7 +162,7 @@ export async function approveAndDeliverAction(form: FormData): Promise<void> {
   revalidatePath(`/staff/requests/${requestId}`);
 }
 
-/** Honour a deletion request: the briefing and its findings go, the audit trail stays. */
+/** Honour a deletion request: the briefing, findings and mail go, the audit trail stays. */
 export async function purgeRequestAction(form: FormData): Promise<void> {
   const staff = await requireStaff();
   const requestId = String(form.get('requestId'));
@@ -170,6 +170,7 @@ export async function purgeRequestAction(form: FormData): Promise<void> {
   await transaction(async (client) => {
     await client.query(`DELETE FROM reports WHERE request_id = $1`, [requestId]);
     await client.query(`DELETE FROM findings WHERE request_id = $1`, [requestId]);
+    await client.query(`DELETE FROM email_outbox WHERE request_id = $1`, [requestId]);
     await client.query(`UPDATE tokens SET revoked_at = now() WHERE request_id = $1`, [requestId]);
     await client.query(
       `UPDATE requests

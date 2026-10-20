@@ -143,10 +143,14 @@ def queue_mail(
 def purge_expired(conn: psycopg.Connection) -> int:
     """Delete requests past their retention date, and their dependent rows."""
     with conn.cursor() as cur:
-        cur.execute(
-            "DELETE FROM requests WHERE delete_after < now() RETURNING id",
-        )
+        cur.execute("SELECT id FROM requests WHERE delete_after < now()")
         deleted = cur.fetchall()
+        expired = [row["id"] for row in deleted]
+        if expired:
+            # Mail carries the contact address and the business name in its body,
+            # and its foreign key only nulls out, so it has to go explicitly.
+            cur.execute("DELETE FROM email_outbox WHERE request_id = ANY(%s)", (expired,))
+            cur.execute("DELETE FROM requests WHERE id = ANY(%s)", (expired,))
         cur.execute("DELETE FROM rate_limits WHERE window_start < now() - interval '2 days'")
     return len(deleted)
 

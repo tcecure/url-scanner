@@ -86,6 +86,48 @@ describe('the customer-facing pages', () => {
   });
 });
 
+describe('the privacy notice', () => {
+  it('points at the main TCecure policy', () => {
+    const privacy = read(...PRIVACY);
+    expect(privacy).toContain('TCecure-Privacy-Policy.pdf');
+    expect(privacy).toMatch(/TCecure Privacy Policy/);
+  });
+
+  it('covers each subject the Service handles', () => {
+    const privacy = read(...PRIVACY);
+    for (const heading of [
+      'Personal Information',
+      'Use of Personal Information',
+      'Disclosure of Personal Information',
+      'What the review observes',
+      'Report delivery',
+      'Other Information',
+      'Service providers',
+      'Security',
+      'Retention, backups and deletion',
+      'Choices and access',
+      'Contact us',
+    ]) {
+      expect(privacy, heading).toContain(`>${heading}<`);
+    }
+  });
+
+  it('states the retention and link lifetimes the app actually enforces', () => {
+    const privacy = read(...PRIVACY);
+    expect(privacy).toContain('config.retentionDays()');
+    expect(privacy).toContain('config.reportLinkTtlHours()');
+    expect(privacy).toMatch(/deleted after 14 days/);
+    expect(privacy).toMatch(/privacy@tcecure\.com/);
+  });
+
+  it('claims no practice the Service does not follow', () => {
+    const privacy = read(...PRIVACY);
+    expect(privacy).not.toMatch(/we (use|collect) cookies|Flash|web beacons|focus group/i);
+    expect(privacy).toMatch(/set no cookies and use no pixel tags, analytics/);
+    expect(privacy).toMatch(/not a penetration test/);
+  });
+});
+
 describe('the probing endpoint and button', () => {
   it('are gone, so no customer action can queue an authorization probe', () => {
     expect(existsSync(src('app', 'api', 'authorization', 'route.ts'))).toBe(false);
